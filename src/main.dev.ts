@@ -11,7 +11,7 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import path from 'path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, Tray, Menu } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -35,7 +35,7 @@ if (
   process.env.NODE_ENV === 'development' ||
   process.env.DEBUG_PROD === 'true'
 ) {
-  require('electron-debug')();
+  //require('electron-debug')();
 }
 
 const installExtensions = async () => {
@@ -50,6 +50,35 @@ const installExtensions = async () => {
     )
     .catch(console.log);
 };
+
+let isQuiting: boolean;
+let tray: Tray;
+
+app.on('before-quit', () => {
+  isQuiting = true;
+});
+
+app.on('ready', () => {
+  tray = new Tray(path.join(__dirname, 'tray.png'));
+
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'Show App',
+        click: () => {
+          mainWindow?.show();
+        },
+      },
+      {
+        label: 'Exit',
+        click: () => {
+          isQuiting = true;
+          app.quit();
+        },
+      },
+    ])
+  );
+});
 
 const createWindow = async () => {
   if (
@@ -93,8 +122,19 @@ const createWindow = async () => {
     }
   });
 
+  mainWindow.on('close', (event) => {
+    if (!isQuiting) {
+      event.preventDefault();
+      mainWindow?.hide();
+      event.returnValue = false;
+    }
+  });
+
   mainWindow.on('closed', () => {
-    mainWindow = null;
+    // mainWindow = null;
+    if (!isQuiting) {
+      mainWindow?.hide();
+    }
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
